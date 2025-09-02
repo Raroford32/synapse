@@ -1,9 +1,13 @@
 """Document management endpoints"""
 from typing import List, Optional
-from fastapi import APIRouter, UploadFile, File, Header, HTTPException
+from fastapi import APIRouter, UploadFile, File, Header, HTTPException, Depends
 from pydantic import BaseModel
+from fastapi import Request
+from app.core.services import ServiceManager
 
-router = APIRouter()
+from app.core.auth import require_api_key
+
+router = APIRouter(dependencies=[Depends(require_api_key)])
 
 
 class SearchRequest(BaseModel):
@@ -14,20 +18,17 @@ class SearchRequest(BaseModel):
 
 @router.post("/documents/upload")
 async def upload_documents(
+    request: Request,
     files: List[UploadFile] = File(...),
     authorization: Optional[str] = Header(None)
 ):
     """Upload documents to the RAG system"""
-    # TODO: Implement with R2R
+    services: ServiceManager = request.app.state.services
     uploaded = []
-    
     for file in files:
-        # TODO: Process and index file
-        uploaded.append({
-            "filename": file.filename,
-            "size": file.size,
-            "status": "indexed"
-        })
+        content = await file.read()
+        doc = await services.rag.ingest_bytes(file.filename, content)
+        uploaded.append({"filename": file.filename, "size": len(content), "status": "indexed", "id": doc["id"]})
     
     return {
         "status": "success",
@@ -39,27 +40,30 @@ async def upload_documents(
 @router.post("/documents/search")
 async def search_documents(
     request: SearchRequest,
+    req: Request,
     x_user_id: Optional[str] = Header(None),
     authorization: Optional[str] = Header(None)
 ):
     """Search documents with optional memory context"""
-    # TODO: Implement with R2R + Mem0
+    services: ServiceManager = req.app.state.services
+    results = await services.rag.search(request.query, limit=request.limit)
     return {
         "query": request.query,
-        "results": [],
-        "count": 0,
-        "user_context_applied": request.use_memory and x_user_id is not None
+        "results": results,
+        "count": len(results),
+        "user_context_applied": request.use_memory and x_user_id is not None,
     }
 
 
 @router.delete("/documents/{document_id}")
 async def delete_document(
     document_id: str,
+    request: Request,
     authorization: Optional[str] = Header(None)
 ):
     """Delete a document from the system"""
-    # TODO: Implement with R2R
-    return {
-        "status": "deleted",
-        "document_id": document_id
-    }
+    services: ServiceManager = request.app.state.services
+    ok = await services.rag.delete(document_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return {"status": "deleted", "document_id": document_id}

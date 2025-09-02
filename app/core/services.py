@@ -3,6 +3,7 @@ import logging
 from typing import Optional
 
 from app.core.config import settings
+from app.services import LLMService, MemoryService, RagService
 
 logger = logging.getLogger(__name__)
 
@@ -11,9 +12,9 @@ class ServiceManager:
     """Manages all application services"""
     
     def __init__(self):
-        self.llm = None
-        self.memory = None
-        self.rag = None
+        self.llm: LLMService | None = None
+        self.memory: MemoryService | None = None
+        self.rag: RagService | None = None
         self.mcp = None
         
     async def initialize(self):
@@ -37,22 +38,8 @@ class ServiceManager:
     async def _init_llm(self):
         """Initialize LiteLLM with available providers"""
         try:
-            # TODO: Import and initialize actual LiteLLM service
             logger.info("Initializing LLM service...")
-            
-            # Check available providers
-            providers = []
-            if settings.OPENAI_API_KEY:
-                providers.append("openai")
-            if settings.ANTHROPIC_API_KEY:
-                providers.append("anthropic")
-            if settings.GOOGLE_API_KEY:
-                providers.append("google")
-            
-            logger.info(f"Available LLM providers: {providers}")
-            
-            # self.llm = LLMService(providers)
-            
+            self.llm = LLMService()
         except Exception as e:
             logger.error(f"Failed to initialize LLM service: {e}")
             raise
@@ -61,10 +48,7 @@ class ServiceManager:
         """Initialize Mem0 memory system"""
         try:
             logger.info("Initializing Memory service...")
-            
-            # TODO: Import and initialize actual Mem0
-            # self.memory = MemoryService(settings.DATABASE_URL)
-            
+            self.memory = MemoryService()
         except Exception as e:
             logger.error(f"Failed to initialize Memory service: {e}")
             raise
@@ -73,10 +57,7 @@ class ServiceManager:
         """Initialize R2R RAG system"""
         try:
             logger.info("Initializing RAG service...")
-            
-            # TODO: Import and initialize actual R2R
-            # self.rag = RAGService(settings.DATABASE_URL)
-            
+            self.rag = RagService()
         except Exception as e:
             logger.error(f"Failed to initialize RAG service: {e}")
             raise
