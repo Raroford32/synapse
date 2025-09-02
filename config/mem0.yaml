@@ -1,0 +1,86 @@
+# Mem0 Memory System Configuration
+
+version: "0.1.0"
+
+# Vector store configuration
+vector_store:
+  provider: "pgvector"
+  config:
+    dimension: 1536
+    metric: "cosine"
+    index_type: "ivfflat"
+    lists: 100
+
+# Memory types and their configurations
+memory_types:
+  general:
+    description: "General purpose memories"
+    ttl_days: 30
+    max_tokens: 500
+    auto_consolidate: true
+  
+  conversation:
+    description: "Conversation history and context"
+    ttl_days: 7
+    max_tokens: 1000
+    auto_consolidate: false
+  
+  procedural:
+    description: "Multi-step procedures and workflows"
+    ttl_days: 90
+    max_tokens: 2000
+    auto_consolidate: true
+    compression_enabled: true
+  
+  preference:
+    description: "User preferences and settings"
+    ttl_days: 365
+    max_tokens: 200
+    auto_consolidate: true
+  
+  fact:
+    description: "Facts and knowledge"
+    ttl_days: 180
+    max_tokens: 300
+    auto_consolidate: true
+
+# Memory consolidation settings
+consolidation:
+  enabled: true
+  similarity_threshold: 0.85
+  min_memories_to_consolidate: 3
+  schedule: "0 2 * * *"  # Daily at 2 AM
+
+# Memory retrieval settings
+retrieval:
+  default_limit: 10
+  similarity_threshold: 0.7
+  rerank_enabled: true
+  include_metadata: true
+
+# User profile settings
+user_profile:
+  default_interaction_style: "balanced"
+  default_context_retention: "session"
+  track_expertise: true
+  track_preferences: true
+
+# Memory scoring and ranking
+scoring:
+  factors:
+    - name: "recency"
+      weight: 0.3
+    - name: "frequency"
+      weight: 0.2
+    - name: "relevance"
+      weight: 0.5
+  
+  decay_rate: 0.95  # Daily decay for relevance scores
+
+# Cleanup settings
+cleanup:
+  enabled: true
+  schedule: "0 3 * * 0"  # Weekly on Sunday at 3 AM
+  keep_high_value: true
+  min_relevance_score: 2.0
+  min_access_count: 5

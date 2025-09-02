@@ -1,0 +1,150 @@
+# R2R RAG System Configuration
+
+version: "0.1.0"
+
+# Document processing settings
+document_processing:
+  # Supported file types
+  supported_formats:
+    - pdf
+    - txt
+    - md
+    - docx
+    - html
+    - csv
+    - json
+    - xml
+    - py
+    - js
+    - ts
+    - java
+    - cpp
+    - go
+    - rs
+    - rb
+    - php
+  
+  # Maximum file size in MB
+  max_file_size: 100
+  
+  # Text extraction settings
+  extraction:
+    pdf:
+      use_ocr: false
+      extract_images: false
+      extract_tables: true
+    
+    code:
+      include_comments: true
+      syntax_highlighting: false
+      extract_functions: true
+
+# Chunking configuration
+chunking:
+  strategy: "recursive"  # recursive, fixed, semantic
+  chunk_size: 512
+  chunk_overlap: 50
+  min_chunk_size: 100
+  max_chunk_size: 1000
+  
+  # Semantic chunking settings
+  semantic:
+    similarity_threshold: 0.8
+    use_sentence_boundaries: true
+
+# Embedding configuration
+embedding:
+  model: "text-embedding-3-small"
+  dimension: 1536
+  batch_size: 100
+  normalize: true
+
+# Vector store configuration
+vector_store:
+  provider: "pgvector"
+  index_type: "ivfflat"
+  metric: "cosine"
+  lists: 100
+  probes: 10
+
+# Search configuration
+search:
+  # Hybrid search weights
+  hybrid:
+    vector_weight: 0.7
+    keyword_weight: 0.3
+  
+  # Search parameters
+  default_limit: 10
+  max_limit: 100
+  similarity_threshold: 0.5
+  
+  # Reranking
+  rerank:
+    enabled: true
+    model: "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    top_k: 20
+
+# Knowledge graph configuration
+knowledge_graph:
+  enabled: true
+  extract_entities: true
+  extract_relationships: true
+  
+  # Entity extraction
+  entity_types:
+    - person
+    - organization
+    - location
+    - date
+    - technology
+    - concept
+  
+  # Relationship extraction
+  relationship_types:
+    - uses
+    - contains
+    - references
+    - implements
+    - extends
+    - depends_on
+
+# Collection settings
+collections:
+  allow_public: false
+  max_per_user: 100
+  default_visibility: "private"
+
+# Ingestion pipeline
+ingestion:
+  # Preprocessing
+  preprocessing:
+    lowercase: false
+    remove_html: true
+    remove_urls: false
+    remove_emails: false
+  
+  # Metadata extraction
+  extract_metadata: true
+  metadata_fields:
+    - title
+    - author
+    - date
+    - keywords
+    - summary
+
+# Caching configuration
+cache:
+  enabled: true
+  ttl_seconds: 3600
+  max_entries: 1000
+
+# Evaluation metrics
+evaluation:
+  enabled: true
+  metrics:
+    - precision
+    - recall
+    - f1_score
+    - mrr  # Mean Reciprocal Rank
+    - ndcg  # Normalized Discounted Cumulative Gain
