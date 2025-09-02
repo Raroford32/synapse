@@ -11,6 +11,7 @@ from app.api import chat, memory, documents, health
 from app.core.config import settings
 from app.core.database import init_db
 from app.core.services import ServiceManager
+from app.core.middleware import request_id_middleware, rate_limit_middleware
 
 
 @asynccontextmanager
@@ -53,6 +54,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Custom middlewares
+app.middleware("http")(request_id_middleware)
+app.middleware("http")(rate_limit_middleware)
 
 # Include routers
 app.include_router(health.router, tags=["health"])

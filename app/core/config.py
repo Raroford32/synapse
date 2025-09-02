@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     
     # Logging
     LOG_LEVEL: str = "INFO"
+    RATE_LIMIT_PER_MINUTE: int = 180
     
     # Optional services
     SENTRY_DSN: Optional[str] = None

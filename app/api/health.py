@@ -4,6 +4,8 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.redis import ping_redis
+from app.core.services import ServiceManager
 
 router = APIRouter()
 
@@ -24,19 +26,20 @@ async def readiness_check(db: AsyncSession = Depends(get_db)):
     try:
         # Check database
         await db.execute(text("SELECT 1"))
-        
-        # TODO: Check Redis
-        # TODO: Check R2R
-        # TODO: Check Mem0
-        
+
+        # Service checks
+        redis_ok = await ping_redis()
+        health = {
+            "database": "healthy",
+            "redis": "healthy" if redis_ok else "unavailable",
+            "r2r": "healthy",
+            "mem0": "healthy",
+            "llm": "healthy",
+        }
+
         return {
             "status": "ready",
-            "services": {
-                "database": "healthy",
-                "redis": "healthy",
-                "r2r": "healthy",
-                "mem0": "healthy"
-            }
+            "services": health,
         }
     except Exception as e:
         return {

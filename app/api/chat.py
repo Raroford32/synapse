@@ -2,11 +2,14 @@
 import time
 import uuid
 from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, HTTPException, Header, Request
+from fastapi import APIRouter, HTTPException, Header, Request, Depends, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-router = APIRouter()
+from app.core.auth import require_api_key
+from app.core.services import ServiceManager
+
+router = APIRouter(dependencies=[Depends(require_api_key)])
 
 
 class Message(BaseModel):
@@ -49,15 +52,27 @@ async def chat_completions(
     
     try:
         if request.stream:
-            # Streaming response
+            # Streaming response via LLM service
             return StreamingResponse(
-                stream_chat_completion(request, services, user_id),
-                media_type="text/event-stream"
+                services.llm.stream_chat_completion(
+                    model=request.model,
+                    messages=[m.model_dump() for m in request.messages],
+                    temperature=request.temperature or 0.7,
+                    max_tokens=request.max_tokens,
+                    user_id=user_id,
+                ),
+                media_type="text/event-stream",
             )
         else:
-            # Regular response
-            response = await generate_chat_completion(request, services, user_id)
-            return response
+            # Regular response via LLM service
+            result = await services.llm.create_chat_completion(
+                model=request.model,
+                messages=[m.model_dump() for m in request.messages],
+                temperature=request.temperature or 0.7,
+                max_tokens=request.max_tokens,
+                user_id=user_id,
+            )
+            return result
             
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -68,71 +83,27 @@ async def generate_chat_completion(
     services,
     user_id: str
 ) -> ChatCompletionResponse:
-    """Generate a chat completion"""
-    
-    # TODO: Implement actual logic with LiteLLM + Mem0 + R2R
-    # For now, return a mock response
-    
-    completion_id = f"chatcmpl-{uuid.uuid4()}"
-    
-    return ChatCompletionResponse(
-        id=completion_id,
-        created=int(time.time()),
+    """Deprecated: kept for compatibility; not used after service wiring."""
+    result = await services.llm.create_chat_completion(
         model=request.model,
-        choices=[{
-            "index": 0,
-            "message": {
-                "role": "assistant",
-                "content": "Hello! I'm Synapse, your AI assistant with persistent memory. This is a placeholder response - the actual implementation will integrate LiteLLM, Mem0, and R2R."
-            },
-            "finish_reason": "stop"
-        }],
-        usage={
-            "prompt_tokens": 10,
-            "completion_tokens": 20,
-            "total_tokens": 30
-        }
+        messages=[m.model_dump() for m in request.messages],
+        temperature=request.temperature or 0.7,
+        max_tokens=request.max_tokens,
+        user_id=user_id,
     )
+    return ChatCompletionResponse(**result)
 
 
 async def stream_chat_completion(request, services, user_id):
-    """Stream a chat completion"""
-    
-    # TODO: Implement actual streaming with LiteLLM
-    # For now, yield mock SSE events
-    
-    completion_id = f"chatcmpl-{uuid.uuid4()}"
-    
-    # Initial chunk
-    yield f"data: {{"
-    yield f'"id":"{completion_id}",'
-    yield f'"object":"chat.completion.chunk",'
-    yield f'"created":{int(time.time())},'
-    yield f'"model":"{request.model}",'
-    yield f'"choices":[{{"index":0,"delta":{{"role":"assistant"}},"finish_reason":null}}]'
-    yield f"}}\n\n"
-    
-    # Content chunks
-    content = "Hello! I'm Synapse. This is a streaming response placeholder."
-    for word in content.split():
-        yield f"data: {{"
-        yield f'"id":"{completion_id}",'
-        yield f'"object":"chat.completion.chunk",'
-        yield f'"created":{int(time.time())},'
-        yield f'"model":"{request.model}",'
-        yield f'"choices":[{{"index":0,"delta":{{"content":" {word}"}},"finish_reason":null}}]'
-        yield f"}}\n\n"
-    
-    # Final chunk
-    yield f"data: {{"
-    yield f'"id":"{completion_id}",'
-    yield f'"object":"chat.completion.chunk",'
-    yield f'"created":{int(time.time())},'
-    yield f'"model":"{request.model}",'
-    yield f'"choices":[{{"index":0,"delta":{{}},"finish_reason":"stop"}}]'
-    yield f"}}\n\n"
-    
-    yield "data: [DONE]\n\n"
+    """Deprecated: Use services.llm.stream_chat_completion directly."""
+    async for chunk in services.llm.stream_chat_completion(
+        model=request.model,
+        messages=[m.model_dump() for m in request.messages],
+        temperature=request.temperature or 0.7,
+        max_tokens=request.max_tokens,
+        user_id=user_id,
+    ):
+        yield chunk
 
 
 @router.get("/models")
@@ -164,3 +135,19 @@ async def list_models():
             }
         ]
     }
+
+
+@router.websocket("/ws/chat/{user_id}")
+async def chat_ws(websocket: WebSocket, user_id: str):
+    await websocket.accept()
+    services: ServiceManager = websocket.app.state.services
+    try:
+        while True:
+            data = await websocket.receive_json()
+            messages = data.get("messages") or [{"role": "user", "content": data.get("message", "")}]
+            async for chunk in services.llm.stream_chat_completion(
+                model=data.get("model", "synapse"), messages=messages, user_id=user_id
+            ):
+                await websocket.send_text(chunk)
+    except WebSocketDisconnect:
+        await websocket.close()
